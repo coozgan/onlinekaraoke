@@ -3,3 +3,5 @@ AGENTS.md
 .agents/
 .jcode/
 .DS_Store
+tv-app/build/
+tv-app/*.apk

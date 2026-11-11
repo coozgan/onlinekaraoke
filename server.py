@@ -13,7 +13,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 VIDEO_ID = re.compile(r'^[A-Za-z0-9_-]{11}$')
 LINK = re.compile(r'(?:youtu\.be/|[?&]v=|/shorts/|/embed/|/live/)([A-Za-z0-9_-]{11})')
 KARAOKE = re.compile(r'karaoke|videoke|minus ?one|instrumental|backing track|sing ?along', re.I)
-PER_GUEST = 3  # same limit as Songerist rooms
+PER_GUEST = 10  # songs each guest can have waiting
 # Most viewed karaoke videos uploaded this year (sp = sort by views, this year, videos only).
 TRENDING = 'https://www.youtube.com/results?search_query=karaoke&sp=CAMSBAgFEAE'
 POOL = ThreadPoolExecutor(16)
@@ -239,11 +239,14 @@ def tunnel(port):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '8010'))
-    ROOM.base = f'http://{lan_ip()}:{port}'
+    ROOM.base = (os.environ.get('PUBLIC_URL') or f'http://{lan_ip()}:{port}').rstrip('/')
+    ROOM.tv_key = os.environ.get('TV_KEY') or ROOM.tv_key  # set it so the TV app's link survives restarts
+    if len(ROOM.tv_key) < 16:
+        sys.exit('TV_KEY must be at least 16 characters. Make one with: python3 -c "import secrets;print(secrets.token_urlsafe(16))"')
     server = ThreadingHTTPServer(('0.0.0.0', port), H)  # 0.0.0.0 so phones on the Wi-Fi can reach it
     threading.Thread(target=lambda: search(''), daemon=True).start()  # warm trending so phones see it at once
     if '--online' in sys.argv:
         threading.Thread(target=tunnel, args=(port,), daemon=True).start()
-    print(f'TV screen (open on the big screen): http://localhost:{port}/tv#{ROOM.tv_key}\n'
+    print(f'TV screen (open on the big screen): http://{lan_ip()}:{port}/tv#{ROOM.tv_key}\n'
           f'Phones join: {ROOM.join_url()}   room code {ROOM.code}', flush=True)
     server.serve_forever()

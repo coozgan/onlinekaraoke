@@ -79,6 +79,7 @@ $('go').onclick = () => {
   document.documentElement.requestFullscreen?.().catch(() => {});
   const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.append(s);
 };
+if (/KaraokeTV/.test(navigator.userAgent)) $('go').click();  // the TV app allows sound without a click
 </script>
 </body>
 </html>

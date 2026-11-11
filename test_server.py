@@ -12,9 +12,9 @@ class T(unittest.TestCase):
         self.assertIsNone(r.reserve('Ann', 'aaaaaaaaaaa', 'A', ''))
         self.assertEqual(r.current['id'], 'aaaaaaaaaaa')  # first song starts at once
         self.assertIn('already', r.reserve('Bob', 'aaaaaaaaaaa', 'A', ''))
-        for i in 'bcd':
+        for i in 'bcdefghijk':
             self.assertIsNone(r.reserve('Ann', i * 11, i, ''))
-        self.assertIn('3 songs', r.reserve('ann', 'eeeeeeeeeee', 'e', ''))  # limit ignores case
+        self.assertIn('10 songs', r.reserve('ann', 'lllllllllll', 'l', ''))  # limit ignores case
         self.assertIsNone(r.control('top', r.queue[2]['n']))
         self.assertEqual(r.queue[0]['id'], 'ddddddddddd')
         r.ended(999)  # stale report from the TV does nothing
