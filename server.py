@@ -231,7 +231,9 @@ def tunnel(port):
         found = re.search(r'https://[a-z0-9-]+\.trycloudflare\.com', line)
         if found:
             ROOM.base = found.group(0)
-            print(f'Online join link: {ROOM.join_url()}', flush=True)
+            print(f'Online join link: {ROOM.join_url()}\n'
+                  # Some label-restricted videos only play when the embedding page is https on a real domain.
+                  f'TV screen over HTTPS (plays more videos): {ROOM.base}/tv#{ROOM.tv_key}', flush=True)
             break
     for _ in proc.stderr:  # keep reading so cloudflared never blocks on a full pipe
         pass
