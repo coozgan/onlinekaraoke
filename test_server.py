@@ -49,6 +49,24 @@ class T(unittest.TestCase):
         status, _ = post('/api/control', {'key': room.tv_key, 'action': 'nope'})
         self.assertEqual(status, 400)
 
+    def test_search_filters_and_caches(self):
+        calls = []
+        fake = [{'id': 'okokokokok1', 'title': 'Song A Karaoke'}, {'id': 'blockedvid1', 'title': 'Song B Karaoke'},
+                {'id': 'okokokokok2', 'title': 'Song C Official Video'}]
+        orig = server.yt, server.embeddable
+        server.yt = lambda t: calls.append(t) or fake
+        server.embeddable = lambda vid: vid != 'blockedvid1'
+        try:
+            server._cache.clear()
+            self.assertEqual([r['id'] for r in server.search('song')], ['okokokokok1'])  # blocked + non-karaoke dropped
+            server.search('SONG ')
+            self.assertEqual(len(calls), 1)  # second search served from cache
+            server.search('')
+            self.assertEqual(calls[-1], server.TRENDING)
+        finally:
+            server.yt, server.embeddable = orig
+            server._cache.clear()
+
 
 if __name__ == '__main__':
     unittest.main()

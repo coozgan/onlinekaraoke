@@ -4,7 +4,8 @@
 Run: python3 server.py            (phones on the same Wi-Fi)
      python3 server.py --online   (also opens a public cloudflared link)
 """
-import atexit, json, os, re, secrets, socket, subprocess, sys, threading
+import atexit, json, os, re, secrets, socket, subprocess, sys, threading, time, urllib.error, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -13,6 +14,9 @@ VIDEO_ID = re.compile(r'^[A-Za-z0-9_-]{11}$')
 LINK = re.compile(r'(?:youtu\.be/|[?&]v=|/shorts/|/embed/|/live/)([A-Za-z0-9_-]{11})')
 KARAOKE = re.compile(r'karaoke|videoke|minus ?one|instrumental|backing track|sing ?along', re.I)
 PER_GUEST = 3  # same limit as Songerist rooms
+# Most viewed karaoke videos uploaded this year (sp = sort by views, this year, videos only).
+TRENDING = 'https://www.youtube.com/results?search_query=karaoke&sp=CAMSBAgFEAE'
+POOL = ThreadPoolExecutor(16)
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com; "
        "frame-src https://www.youtube-nocookie.com https://www.youtube.com; img-src 'self' https://i.ytimg.com; "
        "style-src 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'")
@@ -88,7 +92,7 @@ ROOM = Room()
 
 def yt(target):
     """Ask yt-dlp for a search or a single video. List args, no shell: the query is never interpreted."""
-    out = subprocess.run(['yt-dlp', '--flat-playlist', '-J', '--no-warnings', '--', target],
+    out = subprocess.run(['yt-dlp', '--flat-playlist', '--playlist-end', '40', '-J', '--no-warnings', '--', target],
                          capture_output=True, text=True, timeout=30)
     if out.returncode:
         raise RuntimeError('YouTube search failed. Check the internet connection.')
@@ -96,18 +100,39 @@ def yt(target):
     return data.get('entries') or [data]
 
 
+def embeddable(vid):
+    """YouTube's oEmbed answers 401/403 when the owner disabled playback on other sites, 404 when it's gone."""
+    try:
+        urllib.request.urlopen('https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=' + vid,
+                               timeout=4).close()
+        return True
+    except urllib.error.HTTPError as e:
+        return e.code == 429 or e.code >= 500  # rate limited or YouTube down: keep it, the TV still skips failures
+    except OSError:
+        return True
+
+
+_cache = {}
 def search(q):
+    """Empty q gives trending. Results are cached so repeat searches and trending are instant."""
     q = q.strip()[:100]
-    if not q:
-        return []
+    hit = _cache.get(q.lower())
+    if hit and time.time() - hit[0] < 3600:
+        return hit[1]
     link = LINK.search(q)
     if link:  # a pasted link plays as-is, like Songerist's "My YouTube"
         items = yt('https://www.youtube.com/watch?v=' + link.group(1))
     else:  # like Songerist: only videos whose title says karaoke / minus one / instrumental
-        items = [e for e in yt(f'ytsearch25:{q} karaoke') if KARAOKE.search(e.get('title') or '')]
-    return [{'id': e['id'], 'title': e.get('title') or e['id'], 'duration': e.get('duration'),
-             'channel': e.get('channel') or e.get('uploader') or ''}
-            for e in items if VIDEO_ID.match(e.get('id') or '')][:15]
+        items = [e for e in yt(f'ytsearch20:{q} karaoke' if q else TRENDING) if KARAOKE.search(e.get('title') or '')]
+    items = [e for e in items if VIDEO_ID.match(e.get('id') or '')][:25]
+    ok = list(POOL.map(embeddable, [e['id'] for e in items]))
+    results = [{'id': e['id'], 'title': e.get('title') or e['id'], 'duration': e.get('duration'),
+                'channel': e.get('channel') or e.get('uploader') or ''}
+               for e, good in zip(items, ok) if good][:20 if q else 25]
+    if len(_cache) > 500:  # ponytail: crude bound, fine for one party; use an LRU if rooms get long-lived
+        _cache.clear()
+    _cache[q.lower()] = (time.time(), results)
+    return results
 
 
 _qr = {}
@@ -216,6 +241,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', '8010'))
     ROOM.base = f'http://{lan_ip()}:{port}'
     server = ThreadingHTTPServer(('0.0.0.0', port), H)  # 0.0.0.0 so phones on the Wi-Fi can reach it
+    threading.Thread(target=lambda: search(''), daemon=True).start()  # warm trending so phones see it at once
     if '--online' in sys.argv:
         threading.Thread(target=tunnel, args=(port,), daemon=True).start()
     print(f'TV screen (open on the big screen): http://localhost:{port}/tv#{ROOM.tv_key}\n'

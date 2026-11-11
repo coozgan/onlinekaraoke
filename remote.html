@@ -49,6 +49,7 @@
     <form id="searchForm" role="search">
       <input id="q" type="search" maxlength="100" placeholder="Song, artist, or a YouTube link" aria-label="Search YouTube karaoke">
       <button class="primary">Search</button>
+      <button type="button" id="trend">🔥 Trending</button>
     </form>
     <p id="msg" role="status"></p>
     <div class="box" id="results" hidden></div>
@@ -106,14 +107,14 @@ function paint(s) {
 function act(action, item) { call('/api/control', {action, item}).then(paint, e => say(e, true)); }
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
 
-$('searchForm').onsubmit = async e => {
-  e.preventDefault();
-  const q = $('q').value.trim();
-  if (!q) return;
-  say('Searching YouTube…');
+$('searchForm').onsubmit = e => { e.preventDefault(); find($('q').value.trim()); };
+$('trend').onclick = () => { $('q').value = ''; find(''); };
+async function find(q) {
+  say(q ? 'Searching YouTube…' : 'Loading trending karaoke…');
   try {
     const d = await call(`/api/search?code=${encodeURIComponent(code)}&q=${encodeURIComponent(q)}`);
-    say(d.results.length ? '' : 'No karaoke videos found. Try the artist name, or paste a YouTube link.');
+    say(!d.results.length ? 'No karaoke videos found. Try the artist name, or paste a YouTube link.'
+        : q ? '' : 'Trending: most viewed karaoke on YouTube this year');
     $('results').hidden = !d.results.length;
     $('results').replaceChildren(...d.results.map(v => row(v, [v.channel, mins(v.duration)].filter(Boolean).join(' · '), [
       button('＋ Reserve', `Reserve “${v.title}”`, ev => {
@@ -122,7 +123,7 @@ $('searchForm').onsubmit = async e => {
       }),
     ])));
   } catch (err) { say(err, true); }
-};
+}
 
 function poll() {
   if (!code) return;
@@ -138,6 +139,7 @@ async function join(c, n) {
   $('me').textContent = 'as ' + name;
   $('join').hidden = true; $('live').hidden = false;
   poll();
+  if ($('results').hidden) find('');
 }
 function leave(why) {
   code = ''; localStorage.removeItem('karaoke.join');
