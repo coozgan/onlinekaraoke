@@ -62,7 +62,12 @@ function show(s) {
 
 function poll() {
   fetch('/api/state?key=' + encodeURIComponent(key)).then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(show, code => { if (code === 403) { $('err').hidden = false; } })
+    .then(show, code => {
+      if (code !== 403) return;
+      // Our code is taken by another TV (about 1 in 20 million): make a new key, which gives a new code.
+      if (!location.hash) { localStorage.removeItem('karaoke.tv'); location.reload(); }
+      else $('err').hidden = false;
+    })
     .finally(() => setTimeout(poll, 1500));
 }
 

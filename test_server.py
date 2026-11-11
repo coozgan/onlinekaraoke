@@ -46,6 +46,10 @@ class T(unittest.TestCase):
         room = server.ROOMS[s['code']]
         server.ROOMS.clear()  # server restart: the same TV key gets the same code back
         self.assertEqual(post('/api/control', {'key': key, 'action': 'play'})[1]['code'], room.code)
+        other = 'other_' + 'b' * 20
+        server.ROOMS[server.code_for(other)] = room  # pretend another TV's key hashes to an existing code
+        self.assertIsNone(server.tv_room(other))  # refused, so it can never land in someone else's room
+        del server.ROOMS[server.code_for(other)]
         self.assertEqual(post('/api/reserve', {'code': 'WRONG1', 'name': 'x', 'id': 'aaaaaaaaaaa'})[0], 403)
         self.assertEqual(post('/api/reserve', {'code': 'ñ✓', 'name': 'x', 'id': 'aaaaaaaaaaa'})[0], 403)
         self.assertEqual(post('/api/reserve', {'code': room.code.lower(), 'name': 'Zed', 'id': 'zzzzzzzzzzz'})[0], 200)
