@@ -133,7 +133,7 @@ class H(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')  # YouTube embeds need a referrer
         if ctype.startswith('text/html'):
             self.send_header('Content-Security-Policy', CSP)
         self.end_headers()
