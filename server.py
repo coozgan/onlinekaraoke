@@ -249,6 +249,7 @@ if __name__ == '__main__':
     threading.Thread(target=lambda: search(''), daemon=True).start()  # warm trending so phones see it at once
     if '--online' in sys.argv:
         threading.Thread(target=tunnel, args=(port,), daemon=True).start()
-    print(f'TV screen (open on the big screen): http://{lan_ip()}:{port}/tv#{ROOM.tv_key}\n'
+    tv_base = os.environ.get('PUBLIC_URL', '').rstrip('/') or f'http://{lan_ip()}:{port}'
+    print(f'TV screen (open on the big screen): {tv_base}/tv#{ROOM.tv_key}\n'
           f'Phones join: {ROOM.join_url()}   room code {ROOM.code}', flush=True)
     server.serve_forever()
