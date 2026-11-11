@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karaoke TV</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;color:#fff;font:18px/1.4 system-ui,sans-serif;overflow:hidden}
+  #player,#player iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
+  .full{position:fixed;inset:0;display:grid;place-content:center;justify-items:center;gap:.6em;text-align:center;background:radial-gradient(circle at 30% 20%,#3b1f5c,#000 70%)}
+  .full[hidden]{display:none}
+  h1{margin:0;font-size:clamp(28px,5vw,56px)}
+  .code{font-size:clamp(40px,8vw,96px);font-weight:800;letter-spacing:.15em;color:#ff5fb0}
+  #qr{width:min(34vh,320px);background:#fff;padding:10px;border-radius:12px}
+  .mut{color:#bbb}
+  button{font:inherit;font-size:28px;padding:.6em 1.4em;border-radius:14px;border:0;background:#ff5fb0;color:#fff;cursor:pointer}
+  .bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:1.5em;align-items:center;padding:.5em 1em;background:#000b;font-size:20px;transition:opacity .4s}
+  .bar b{color:#ff5fb0}.bar .grow{flex:1}
+  .bar.quiet{opacity:0}
+</style>
+</head>
+<body>
+<div id="player"></div>
+<div class="full" id="start"><h1>🎤 Karaoke TV</h1><p class="mut">Browsers only play sound after a click.</p><button id="go">Start the screen</button></div>
+<div class="full" id="idle" hidden>
+  <h1>Scan to join and reserve songs</h1>
+  <img id="qr" src="/qr.svg" alt="QR code to join this karaoke room">
+  <div>Room code</div><div class="code" id="code">······</div>
+  <div class="mut" id="link"></div>
+</div>
+<div class="bar quiet" id="bar"><span>Now: <b id="now"></b></span><span class="grow"></span><span id="next" class="mut"></span><span>Code <b id="code2"></b></span></div>
+<div class="full" id="err" hidden><h1>This screen link is incomplete</h1><p class="mut">Open the TV link printed by <code>python3 server.py</code>.</p></div>
+<script>
+'use strict';
+const key = location.hash.slice(1), $ = id => document.getElementById(id);
+let yt = null, playing = null, paused = false, last = 0;
+
+const post = (path, body) => fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify(Object.assign({key}, body))}).then(r => r.json()).catch(() => null);
+
+function ended() { if (playing) post('/api/ended', {item: playing.n}); }
+
+function show(s) {
+  $('code').textContent = $('code2').textContent = s.code;
+  $('link').textContent = s.join;
+  $('idle').hidden = !!s.current;
+  $('now').textContent = s.current ? `${s.current.title} · ${s.current.by}` : '';
+  $('next').textContent = s.queue.length ? `Next: ${s.queue[0].title} · ${s.queue[0].by}` : 'Queue is empty';
+  if (!s.current) { if (playing) yt.stopVideo(); playing = null; return; }
+  if (!playing || playing.n !== s.current.n) {
+    playing = s.current; paused = false; yt.loadVideoById(s.current.id);
+    $('bar').classList.remove('quiet'); clearTimeout(last); last = setTimeout(() => $('bar').classList.add('quiet'), 8000);
+  }
+  if (s.paused !== paused) { paused = s.paused; paused ? yt.pauseVideo() : yt.playVideo(); }
+}
+
+function poll() {
+  fetch('/api/state?key=' + encodeURIComponent(key)).then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(show, code => { if (code === 403) { $('err').hidden = false; } })
+    .finally(() => setTimeout(poll, 1500));
+}
+
+window.onYouTubeIframeAPIReady = () => {
+  yt = new YT.Player('player', {
+    host: 'https://www.youtube-nocookie.com', width: '100%', height: '100%',
+    playerVars: {autoplay: 1, controls: 0, rel: 0, playsinline: 1, origin: location.origin},
+    events: {
+      onReady: poll,
+      onStateChange: e => { if (e.data === YT.PlayerState.ENDED) ended(); },
+      // 2 bad id, 5 HTML5 error, 100 removed, 101/150 owner blocks embedding: skip to the next song
+      onError: ended,
+    },
+  });
+};
+
+$('go').onclick = () => {
+  $('start').hidden = true;
+  if (!key) { $('err').hidden = false; return; }
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.append(s);
+};
+</script>
+</body>
+</html>

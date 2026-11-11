@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karaoke remote</title>
+<style>
+  :root{--bg:#18191a;--card:#242526;--fg:#e4e6eb;--mut:#b0b3b8;--acc:#e94fa5;--line:#3a3b3c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif}
+  main{max-width:640px;margin:auto;padding:1em}
+  h1{font-size:22px;margin:.2em 0 .6em}
+  input,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.6em .8em}
+  button{cursor:pointer}button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  form{display:flex;gap:.5em}form input{flex:1;min-width:0}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.8em;margin:.8em 0}
+  .item{display:flex;gap:.7em;align-items:center;padding:.5em 0;border-top:1px solid var(--line)}
+  .item:first-child{border-top:0}
+  .item img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;flex:none;background:#000}
+  .item .grow{flex:1;min-width:0}.item small{color:var(--mut)}
+  .ctl{display:flex;gap:.5em;flex-wrap:wrap}
+  .mut{color:var(--mut)}#msg{min-height:1.4em}#msg.bad{color:#ff7a7a}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <section id="join">
+    <h1>🎤 Join the karaoke</h1>
+    <p class="mut">Type the code shown on the TV, or scan its QR code.</p>
+    <form id="joinForm">
+      <input id="code" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="Room code" aria-label="Room code" required>
+      <input id="name" maxlength="30" autocomplete="nickname" placeholder="Your name" aria-label="Your name" required>
+      <button class="primary">Join</button>
+    </form>
+  </section>
+
+  <section id="live" hidden>
+    <h1>🎤 Room <span id="roomCode"></span> <small class="mut" id="me"></small></h1>
+    <div class="box" aria-live="polite">
+      <div class="mut">Now playing</div>
+      <b id="now">Nothing yet</b>
+      <div class="ctl" style="margin-top:.6em">
+        <button data-act="pause" id="pp">⏸ Pause</button>
+        <button data-act="skip">⏭ Next song</button>
+      </div>
+    </div>
+    <form id="searchForm" role="search">
+      <input id="q" type="search" maxlength="100" placeholder="Song, artist, or a YouTube link" aria-label="Search YouTube karaoke">
+      <button class="primary">Search</button>
+    </form>
+    <p id="msg" role="status"></p>
+    <div class="box" id="results" hidden></div>
+    <h2 style="font-size:18px">Queue</h2>
+    <div class="box" id="queue"></div>
+    <button id="leave">Leave</button>
+  </section>
+</main>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let code = '', name = '', state = null;
+
+// Build elements with text only, so titles from YouTube are never parsed as HTML.
+function el(tag, text, attrs) {
+  const n = document.createElement(tag);
+  if (text != null) n.textContent = text;
+  for (const k in attrs || {}) n.setAttribute(k, attrs[k]);
+  return n;
+}
+function say(text, bad) { $('msg').textContent = text || ''; $('msg').className = bad ? 'bad' : ''; }
+async function call(path, body) {
+  try {
+    const r = await fetch(path, body ? {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(Object.assign({code}, body))} : undefined);
+    const d = await r.json();
+    if (r.status === 403) leave(d.error);
+    return r.ok ? d : Promise.reject(d.error || 'Something went wrong.');
+  } catch (e) { return Promise.reject(typeof e === 'string' ? e : 'No connection to the karaoke. Trying again…'); }
+}
+const mins = s => s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : '';
+
+function row(v, extra, buttons) {
+  const r = el('div', null, {class: 'item'});
+  r.append(el('img', null, {src: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, alt: '', loading: 'lazy'}));
+  const t = el('div', null, {class: 'grow'});
+  t.append(el('div', v.title), el('small', extra));
+  r.append(t, ...buttons);
+  return r;
+}
+function button(text, label, fn) { const b = el('button', text, {'aria-label': label}); b.onclick = fn; return b; }
+
+function paint(s) {
+  state = s;
+  $('roomCode').textContent = s.code;
+  $('now').textContent = s.current ? `${s.current.title} · sung by ${s.current.by}` : 'Nothing yet. Reserve a song below.';
+  $('pp').textContent = s.paused ? '▶ Play' : '⏸ Pause';
+  $('pp').dataset.act = s.paused ? 'play' : 'pause';
+  const list = s.queue.map((q, i) => row(q, `${i + 1}. ${q.by}${q.channel ? ' · ' + q.channel : ''}`, [
+    ...(i ? [button('⤒', `Play “${q.title}” next`, () => act('top', q.n))] : []),
+    button('✕', `Remove “${q.title}”`, () => act('remove', q.n)),
+  ]));
+  $('queue').replaceChildren(...(list.length ? list : [el('p', 'Nothing reserved yet.', {class: 'mut'})]));
+}
+function act(action, item) { call('/api/control', {action, item}).then(paint, e => say(e, true)); }
+document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
+
+$('searchForm').onsubmit = async e => {
+  e.preventDefault();
+  const q = $('q').value.trim();
+  if (!q) return;
+  say('Searching YouTube…');
+  try {
+    const d = await call(`/api/search?code=${encodeURIComponent(code)}&q=${encodeURIComponent(q)}`);
+    say(d.results.length ? '' : 'No karaoke videos found. Try the artist name, or paste a YouTube link.');
+    $('results').hidden = !d.results.length;
+    $('results').replaceChildren(...d.results.map(v => row(v, [v.channel, mins(v.duration)].filter(Boolean).join(' · '), [
+      button('＋ Reserve', `Reserve “${v.title}”`, ev => {
+        call('/api/reserve', {name, id: v.id, title: v.title, channel: v.channel})
+          .then(s => { paint(s); say(`Reserved “${v.title}”.`); ev.target.disabled = true; }, err => say(err, true));
+      }),
+    ])));
+  } catch (err) { say(err, true); }
+};
+
+function poll() {
+  if (!code) return;
+  call('/api/state?code=' + encodeURIComponent(code)).then(paint, () => {}).finally(() => setTimeout(poll, document.hidden ? 6000 : 2000));
+}
+async function join(c, n) {
+  code = c.trim().toUpperCase(); name = n.trim();
+  try {
+    paint(await call('/api/state?code=' + encodeURIComponent(code)));
+  } catch (e) { code = ''; $('join').querySelector('p').textContent = e; return; }
+  localStorage.setItem('karaoke.join', JSON.stringify({code, name}));
+  history.replaceState(null, '', '/?code=' + code);
+  $('me').textContent = 'as ' + name;
+  $('join').hidden = true; $('live').hidden = false;
+  poll();
+}
+function leave(why) {
+  code = ''; localStorage.removeItem('karaoke.join');
+  $('live').hidden = true; $('join').hidden = false;
+  if (why) $('join').querySelector('p').textContent = why;
+}
+$('leave').onclick = () => leave();
+$('joinForm').onsubmit = e => { e.preventDefault(); join($('code').value, $('name').value); };
+
+const saved = JSON.parse(localStorage.getItem('karaoke.join') || 'null');
+const urlCode = new URLSearchParams(location.search).get('code') || '';
+$('code').value = urlCode || saved?.code || '';
+$('name').value = saved?.name || '';
+if (saved && saved.name && (!urlCode || urlCode.toUpperCase() === saved.code)) join(saved.code, saved.name);
+else ($('code').value ? $('name') : $('code')).focus();
+</script>
+</body>
+</html>
