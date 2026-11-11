@@ -5,3 +5,4 @@ AGENTS.md
 .DS_Store
 tv-app/build/
 tv-app/*.apk
+__pycache__/
