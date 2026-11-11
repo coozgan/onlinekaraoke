@@ -6,3 +6,4 @@ AGENTS.md
 tv-app/build/
 tv-app/*.apk
 __pycache__/
+.env
