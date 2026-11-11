@@ -5,7 +5,7 @@
   <uses-feature android:name="android.software.leanback" android:required="false"/>
   <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
   <!-- Cleartext is allowed so the TV can reach the server over plain http on your Wi-Fi. -->
-  <application android:label="Karaoke TV" android:banner="@drawable/banner" android:icon="@drawable/banner"
+  <application android:label="Karaoke TV" android:banner="@drawable/banner" android:icon="@drawable/icon"
       android:usesCleartextTraffic="true" android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
     <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape"
         android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation">

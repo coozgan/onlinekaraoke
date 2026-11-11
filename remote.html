@@ -3,46 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d0a1a">
+<link rel="icon" href="/logo.png">
+<link rel="apple-touch-icon" href="/logo.png">
 <title>Karaoke remote</title>
 <style>
-  :root{--bg:#18191a;--card:#242526;--fg:#e4e6eb;--mut:#b0b3b8;--acc:#e94fa5;--line:#3a3b3c}
+  :root{--bg:#0d0a1a;--card:#171230;--card2:#211a42;--fg:#f2eefc;--mut:#9e95bd;--acc:#ff3da8;--cyan:#2ee6ff;--line:#2d2552}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif}
-  main{max-width:640px;margin:auto;padding:1em}
-  h1{font-size:22px;margin:.2em 0 .6em}
-  input,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.6em .8em}
-  button{cursor:pointer}button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
-  :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-  form{display:flex;gap:.5em}form input{flex:1;min-width:0}
-  .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.8em;margin:.8em 0}
-  .item{display:flex;gap:.7em;align-items:center;padding:.5em 0;border-top:1px solid var(--line)}
-  .item:first-child{border-top:0}
-  .item img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;flex:none;background:#000}
-  .item .grow{flex:1;min-width:0}.item small{color:var(--mut)}
+  body{margin:0;min-height:100vh;color:var(--fg);font:16px/1.45 system-ui,-apple-system,sans-serif;
+    background:radial-gradient(90% 50% at 15% 0%,#ff3da822,transparent),radial-gradient(80% 50% at 88% 12%,#2ee6ff1c,transparent),var(--bg)}
+  main{max-width:640px;margin:auto;padding:1.1em 1em 2.5em}
+  h1,h2{margin:0;letter-spacing:-.01em}
+  input,button{font:inherit;color:inherit;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.68em .9em;min-height:44px}
+  input::placeholder{color:var(--mut)}
+  input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px #2ee6ff2e}
+  button{cursor:pointer;font-weight:600;transition:transform .08s}
+  button:active:not(:disabled){transform:scale(.97)}
+  button:disabled{opacity:.45;cursor:default}
+  button.primary{background:linear-gradient(105deg,var(--acc),#7a4dff 62%,var(--cyan));border:0;color:#fff;box-shadow:0 8px 24px #ff3da838}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  form{display:flex;gap:.55em;flex-wrap:wrap}form input{flex:1;min-width:140px}
+  #code{font:700 18px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;max-width:11em}
+  .hero{text-align:center;padding:1.4em 0 .6em}
+  .hero img{width:104px;height:104px;border-radius:26px;box-shadow:0 16px 44px #000a;margin-bottom:.7em}
+  .top{display:flex;align-items:center;gap:.75em;margin-bottom:.9em}
+  .top img{width:44px;height:44px;border-radius:12px;flex:none}
+  .pill{font:700 14px/1 ui-monospace,monospace;letter-spacing:.1em;padding:.45em .7em;border-radius:9px;background:var(--card2);border:1px solid var(--line);color:var(--cyan)}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:.9em 1em;margin:.75em 0;box-shadow:0 12px 32px #0005}
+  .nowBox{background:linear-gradient(135deg,#241546,#141a38);border-color:#3d2f6e}
+  .kicker{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);margin-bottom:.2em}
+  .item{display:flex;gap:.75em;align-items:center;padding:.6em 0;border-top:1px solid var(--line)}
+  .item:first-child{border-top:0;padding-top:.1em}.item:last-child{padding-bottom:.1em}
+  .item img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;flex:none;background:#000}
+  .item .grow{flex:1;min-width:0}.item .title{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .item small{color:var(--mut);display:block;margin-top:.15em}
   .ctl{display:flex;gap:.5em;flex-wrap:wrap}
-  .mut{color:var(--mut)}#msg{min-height:1.4em}#msg.bad{color:#ff7a7a}
+  .mut{color:var(--mut)}#msg{min-height:1.4em;margin:.5em .2em;font-size:14px;color:var(--cyan)}#msg.bad{color:#ff7aa8}
+  a{color:var(--cyan);text-decoration:none;font-weight:600}a:hover{text-decoration:underline}
   [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main>
   <section id="join">
-    <h1>🎤 Join the karaoke</h1>
-    <p class="mut">Type the code shown on the TV, or scan its QR code.</p>
-    <form id="joinForm">
-      <input id="code" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="Room code" aria-label="Room code" required>
+    <div class="hero">
+      <img src="/logo.png" alt="">
+      <h1>Join the karaoke</h1>
+      <p class="mut" id="joinMsg">Type the code shown on the TV, or scan its QR code.</p>
+    </div>
+    <form id="joinForm" class="box">
+      <input id="code" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="CODE" aria-label="Room code" required>
       <input id="name" maxlength="30" autocomplete="nickname" placeholder="Your name" aria-label="Your name" required>
-      <button class="primary">Join</button>
+      <button class="primary">Join room</button>
     </form>
-    <p class="mut">Want this browser to play the songs? <a href="/tv" style="color:var(--acc)">📺 Use it as the TV screen</a> (it gets its own room code).</p>
+    <p class="mut" style="text-align:center;font-size:14px">Want this browser to play the songs? <a href="/tv">Use it as the TV screen →</a></p>
   </section>
 
   <section id="live" hidden>
-    <h1>🎤 Room <span id="roomCode"></span> <small class="mut" id="me"></small></h1>
-    <div class="box" aria-live="polite">
-      <div class="mut">Now playing</div>
-      <b id="now">Nothing yet</b>
-      <div class="ctl" style="margin-top:.6em">
+    <header class="top">
+      <img src="/logo.png" alt="">
+      <div style="flex:1;min-width:0">
+        <div class="kicker">Karaoke room</div>
+        <div style="display:flex;align-items:baseline;gap:.5em;flex-wrap:wrap"><span class="pill" id="roomCode"></span><small class="mut" id="me"></small></div>
+      </div>
+      <button id="leave">Leave</button>
+    </header>
+    <div class="box nowBox" aria-live="polite">
+      <div class="kicker">Now playing</div>
+      <div style="font-weight:700;font-size:17px" id="now">Nothing yet</div>
+      <div class="ctl" style="margin-top:.65em">
         <button data-act="pause" id="pp">⏸ Pause</button>
         <button data-act="skip">⏭ Next song</button>
       </div>
@@ -54,9 +83,8 @@
     </form>
     <p id="msg" role="status"></p>
     <div class="box" id="results" hidden></div>
-    <h2 style="font-size:18px">Queue</h2>
+    <h2 style="font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:1.1em .2em .3em">Up next</h2>
     <div class="box" id="queue"></div>
-    <button id="leave">Leave</button>
   </section>
 </main>
 <script>
@@ -87,11 +115,11 @@ function row(v, extra, buttons) {
   const r = el('div', null, {class: 'item'});
   r.append(el('img', null, {src: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, alt: '', loading: 'lazy'}));
   const t = el('div', null, {class: 'grow'});
-  t.append(el('div', v.title), el('small', extra));
+  t.append(el('div', v.title, {class: 'title'}), el('small', extra));
   r.append(t, ...buttons);
   return r;
 }
-function button(text, label, fn) { const b = el('button', text, {'aria-label': label}); b.onclick = fn; return b; }
+function button(text, label, fn, cls) { const b = el('button', text, Object.assign({'aria-label': label}, cls ? {class: cls} : {})); b.onclick = fn; return b; }
 
 function paint(s) {
   state = s;
@@ -103,7 +131,7 @@ function paint(s) {
     ...(i ? [button('⤒', `Play “${q.title}” next`, () => act('top', q.n))] : []),
     button('✕', `Remove “${q.title}”`, () => act('remove', q.n)),
   ]));
-  $('queue').replaceChildren(...(list.length ? list : [el('p', 'Nothing reserved yet.', {class: 'mut'})]));
+  $('queue').replaceChildren(...(list.length ? list : [el('p', 'Nothing reserved yet.', {class: 'mut', style: 'margin:.2em 0'})]));
 }
 function act(action, item) { call('/api/control', {action, item}).then(paint, e => say(e, true)); }
 document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
@@ -120,8 +148,8 @@ async function find(q) {
     $('results').replaceChildren(...d.results.map(v => row(v, [v.channel, mins(v.duration)].filter(Boolean).join(' · '), [
       button('＋ Reserve', `Reserve “${v.title}”`, ev => {
         call('/api/reserve', {name, id: v.id, title: v.title, channel: v.channel})
-          .then(s => { paint(s); say(`Reserved “${v.title}”.`); ev.target.disabled = true; }, err => say(err, true));
-      }),
+          .then(s => { paint(s); say(`Reserved “${v.title}”.`); ev.target.textContent = '✓ Queued'; ev.target.disabled = true; }, err => say(err, true));
+      }, 'primary'),
     ])));
   } catch (err) { say(err, true); }
 }
@@ -134,10 +162,10 @@ async function join(c, n) {
   code = c.trim().toUpperCase(); name = n.trim();
   try {
     paint(await call('/api/state?code=' + encodeURIComponent(code)));
-  } catch (e) { code = ''; $('join').querySelector('p').textContent = e; return; }
+  } catch (e) { code = ''; $('joinMsg').textContent = e; $('joinMsg').style.color = '#ff7aa8'; return; }
   localStorage.setItem('karaoke.join', JSON.stringify({code, name}));
   history.replaceState(null, '', '/?code=' + code);
-  $('me').textContent = 'as ' + name;
+  $('me').textContent = 'signed in as ' + name;
   $('join').hidden = true; $('live').hidden = false;
   poll();
   if ($('results').hidden) find('');
@@ -145,7 +173,7 @@ async function join(c, n) {
 function leave(why) {
   code = ''; localStorage.removeItem('karaoke.join');
   $('live').hidden = true; $('join').hidden = false;
-  if (why) $('join').querySelector('p').textContent = why;
+  if (why) { $('joinMsg').textContent = why; $('joinMsg').style.color = '#ff7aa8'; }
 }
 $('leave').onclick = () => leave();
 $('joinForm').onsubmit = e => { e.preventDefault(); join($('code').value, $('name').value); };

@@ -56,6 +56,8 @@ class T(unittest.TestCase):
         self.assertEqual(post('/api/ended', {'code': room.code, 'item': 1})[0], 403)  # guests can't end songs
         with urllib.request.urlopen(base + '/tv') as res:
             self.assertIn("connect-src 'self'", res.headers['Content-Security-Policy'])
+        with urllib.request.urlopen(base + '/logo.png') as res:
+            self.assertEqual((res.status, res.headers['Content-Type']), (200, 'image/png'))
         status, _ = post('/api/control', {'key': key, 'action': 'nope'})
         self.assertEqual(status, 400)
 

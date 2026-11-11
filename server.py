@@ -192,10 +192,13 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
-        pages = {'/': 'remote.html', '/tv': 'tv.html'}
+        pages = {'/': ('remote.html', 'text/html; charset=utf-8'),
+                 '/tv': ('tv.html', 'text/html; charset=utf-8'),
+                 '/logo.png': ('logo.png', 'image/png')}
         if url.path in pages:
-            with open(os.path.join(DIR, pages[url.path]), 'rb') as f:
-                return self.reply(200, f.read(), 'text/html; charset=utf-8')
+            name, ctype = pages[url.path]
+            with open(os.path.join(DIR, name), 'rb') as f:
+                return self.reply(200, f.read(), ctype)
         if url.path == '/qr.svg':
             room = ROOMS.get(q.get('code', '').upper())
             svg = room and qr_svg(room.join_url())

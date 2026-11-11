@@ -3,32 +3,60 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d0a1a">
+<link rel="icon" href="/logo.png">
 <title>Karaoke TV</title>
 <style>
-  html,body{margin:0;height:100%;background:#000;color:#fff;font:18px/1.4 system-ui,sans-serif;overflow:hidden}
+  :root{--bg:#0d0a1a;--card:#171230;--line:#2d2552;--fg:#f2eefc;--mut:#9e95bd;--pink:#ff3da8;--cyan:#2ee6ff}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:18px/1.4 system-ui,-apple-system,sans-serif;overflow:hidden}
   #player,#player iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
-  .full{position:fixed;inset:0;display:grid;place-content:center;justify-items:center;gap:.6em;text-align:center;background:radial-gradient(circle at 30% 20%,#3b1f5c,#000 70%)}
+  .full{position:fixed;inset:0;display:grid;place-content:center;justify-items:center;gap:1.1rem;padding:4vh 5vw;text-align:center;
+    background:radial-gradient(45% 45% at 22% 52%,#ff3da826,transparent),radial-gradient(45% 45% at 78% 48%,#2ee6ff22,transparent),var(--bg)}
   .full[hidden]{display:none}
-  h1{margin:0;font-size:clamp(28px,5vw,56px)}
-  .code{font-size:clamp(40px,8vw,96px);font-weight:800;letter-spacing:.15em;color:#ff5fb0}
-  #qr{width:min(34vh,320px);background:#fff;padding:10px;border-radius:12px}
-  .mut{color:#bbb}
-  button{font:inherit;font-size:28px;padding:.6em 1.4em;border-radius:14px;border:0;background:#ff5fb0;color:#fff;cursor:pointer}
-  .bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:1.5em;align-items:center;padding:.5em 1em;background:#000b;font-size:20px;transition:opacity .4s}
-  .bar b{color:#ff5fb0}.bar .grow{flex:1}
-  .bar.quiet{opacity:0}
+  .logo{width:min(18vh,136px);aspect-ratio:1;border-radius:26%;box-shadow:0 16px 48px #0009}
+  h1{margin:0;font-size:clamp(28px,4.2vw,52px);letter-spacing:-.02em}
+  .stage{display:grid;grid-template-columns:auto 1fr;gap:clamp(24px,4vw,56px);align-items:center;text-align:left;
+    background:var(--card);border:1px solid var(--line);border-radius:28px;padding:clamp(22px,3.4vh,40px) clamp(26px,3.8vw,48px);box-shadow:0 24px 64px #000a}
+  #qr{width:min(36vh,300px);aspect-ratio:1;background:#fff;padding:12px;border-radius:18px;display:block}
+  .kicker{font-size:14px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan)}
+  .code{font:800 clamp(44px,7.2vw,92px)/1.05 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;margin:.08em 0 .15em;
+    background:linear-gradient(95deg,var(--pink),#b967ff 52%,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .mut{color:var(--mut);margin:0}
+  button{font:600 24px/1 inherit;padding:.75em 1.6em;border-radius:14px;border:0;color:#fff;cursor:pointer;
+    background:linear-gradient(100deg,var(--pink),#7a4dff 60%,var(--cyan));box-shadow:0 10px 32px #ff3da840}
+  button:focus-visible{outline:3px solid var(--cyan);outline-offset:4px}
+  .bar{position:fixed;left:2vw;right:2vw;bottom:2.2vh;display:flex;gap:1.2em;align-items:center;padding:.65em 1.1em;
+    background:#120d26e6;border:1px solid var(--line);border-radius:16px;font-size:20px;transition:opacity .4s}
+  .bar img{width:34px;height:34px;border-radius:8px}
+  .bar b{color:var(--pink)}.bar .codeTag{font-family:ui-monospace,monospace;letter-spacing:.08em;color:var(--cyan)}
+  .bar .grow{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar.quiet{opacity:0;pointer-events:none}
 </style>
 </head>
 <body>
 <div id="player"></div>
-<div class="full" id="start"><h1>🎤 Karaoke TV</h1><p class="mut">Browsers only play sound after a click.</p><button id="go">Start the screen</button></div>
-<div class="full" id="idle" hidden>
-  <h1>Scan to join and reserve songs</h1>
-  <img id="qr" alt="QR code to join this karaoke room">
-  <div>Room code</div><div class="code" id="code">······</div>
-  <div class="mut" id="link"></div>
+<div class="full" id="start">
+  <img class="logo" src="/logo.png" alt="">
+  <h1>Karaoke TV</h1>
+  <p class="mut">Browsers only play sound after a click.</p>
+  <button id="go">Start the screen</button>
 </div>
-<div class="bar quiet" id="bar"><span>Now: <b id="now"></b></span><span class="grow"></span><span id="next" class="mut"></span><span>Code <b id="code2"></b></span></div>
+<div class="full" id="idle" hidden>
+  <div class="stage">
+    <img id="qr" alt="QR code to join this karaoke room">
+    <div>
+      <div style="display:flex;align-items:center;gap:.7em;margin-bottom:.9em">
+        <img src="/logo.png" alt="" style="width:48px;height:48px;border-radius:12px">
+        <div><div style="font-weight:700">Karaoke Room</div><p class="mut" style="font-size:15px">Scan the QR code or enter the room code on your phone</p></div>
+      </div>
+      <div class="kicker">Room code</div>
+      <div class="code" id="code">······</div>
+      <p class="mut" id="link"></p>
+    </div>
+  </div>
+</div>
+<div class="bar quiet" id="bar"><img src="/logo.png" alt=""><span class="grow">Now: <b id="now"></b></span><span id="next" class="mut grow"></span><span>Room <b class="codeTag" id="code2"></b></span></div>
 <div class="full" id="err" hidden><h1>This screen can't open a room</h1><p class="mut">Clear the site data and reload.</p></div>
 <script>
 'use strict';

@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends qrencode \
  && pip install --no-cache-dir -U yt-dlp \
  && useradd -r -u 10001 karaoke
 WORKDIR /app
-COPY server.py tv.html remote.html ./
+COPY server.py tv.html remote.html logo.png ./
 USER karaoke
 EXPOSE 8010
 CMD ["python3", "-u", "server.py"]
