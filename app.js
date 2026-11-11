@@ -147,7 +147,7 @@ if (typeof document !== 'undefined') {
     const [name, arg] = path.split('/');
     const page = pages[name];
     $('#view').replaceChildren(...(page ? page(arg) : notFound()).flat().filter(Boolean));
-    $('#pageTitle').textContent = $('#view h1')?.textContent || 'Home';
+    $('#pageTitle').textContent = name ? $('#view h1')?.textContent : 'Home';
     document.querySelectorAll('.side a').forEach(a => a.toggleAttribute('aria-current', a.getAttribute('href') === '#/' + name));
     $('#side').classList.remove('open'); $('#menu').setAttribute('aria-expanded', 'false');
   }
