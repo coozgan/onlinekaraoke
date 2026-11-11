@@ -24,15 +24,20 @@
 <div class="full" id="start"><h1>🎤 Karaoke TV</h1><p class="mut">Browsers only play sound after a click.</p><button id="go">Start the screen</button></div>
 <div class="full" id="idle" hidden>
   <h1>Scan to join and reserve songs</h1>
-  <img id="qr" src="/qr.svg" alt="QR code to join this karaoke room">
+  <img id="qr" alt="QR code to join this karaoke room">
   <div>Room code</div><div class="code" id="code">······</div>
   <div class="mut" id="link"></div>
 </div>
 <div class="bar quiet" id="bar"><span>Now: <b id="now"></b></span><span class="grow"></span><span id="next" class="mut"></span><span>Code <b id="code2"></b></span></div>
-<div class="full" id="err" hidden><h1>This screen link is incomplete</h1><p class="mut">Open the TV link printed by <code>python3 server.py</code>.</p></div>
+<div class="full" id="err" hidden><h1>This screen can't open a room</h1><p class="mut">Clear the site data and reload.</p></div>
 <script>
 'use strict';
-const key = location.hash.slice(1), $ = id => document.getElementById(id);
+// This screen makes its own secret key once and keeps it, so it gets the same room code every time.
+// A #key in the link still wins, so older TV app builds keep their room.
+const key = location.hash.slice(1) || localStorage.getItem('karaoke.tv') ||
+  [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(16).padStart(2, '0')).join('');
+localStorage.setItem('karaoke.tv', key);
+const $ = id => document.getElementById(id);
 let yt = null, playing = null, paused = false, last = 0;
 
 const post = (path, body) => fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -41,6 +46,7 @@ const post = (path, body) => fetch(path, {method: 'POST', headers: {'Content-Typ
 function ended() { if (playing) post('/api/ended', {item: playing.n}); }
 
 function show(s) {
+  if ($('code').textContent !== s.code) $('qr').src = '/qr.svg?code=' + s.code;
   $('code').textContent = $('code2').textContent = s.code;
   $('link').textContent = s.join;
   $('idle').hidden = !!s.current;
@@ -75,7 +81,6 @@ window.onYouTubeIframeAPIReady = () => {
 
 $('go').onclick = () => {
   $('start').hidden = true;
-  if (!key) { $('err').hidden = false; return; }
   document.documentElement.requestFullscreen?.().catch(() => {});
   const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.append(s);
 };

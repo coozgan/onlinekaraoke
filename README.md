@@ -9,9 +9,7 @@ python3 server.py            # guests on the same Wi-Fi
 python3 server.py --online   # also prints a public link for guests outside your Wi-Fi
 ```
 
-The server prints two links:
-- **TV screen**: `http://localhost:8010/tv#<key>`. Open it on the big screen and click **Start the screen**. The key in the link is what lets this screen advance the queue, so don't share it.
-- **Phones**: the join link and the 6-letter room code, which are also shown on the TV.
+Open `/tv` on the big screen and click **Start the screen**. The TV makes its own secret key the first time and keeps it, and the server turns that key into the TV's 6-letter room code. The code stays the same after server restarts, and each TV gets its own room. Phones join with the code or QR shown on the TV.
 
 Phones can search by song or artist (only videos with karaoke, minus one or instrumental in the title, like Songerist) or paste a YouTube link, or tap **Trending** (most viewed karaoke this year, shown on join). Results drop videos whose owners block playback on other sites, and repeat searches come from a 1-hour cache. They can reserve up to 10 songs each, pause or play, skip, move a song to the top, and remove songs. The TV plays the queue in order and skips videos whose owners block embedding.
 
@@ -20,13 +18,11 @@ Phones can search by song or artist (only videos with karaoke, minus one or inst
 The app is a full-screen WebView that opens the TV link and starts with sound, so no click is needed. Build it with the installed Android SDK (no Gradle):
 
 ```
-TV_KEY=$(python3 -c "import secrets;print(secrets.token_urlsafe(18))")   # keep this value
-TV_KEY=$TV_KEY python3 server.py                                          # always start with the same key
-tv-app/build.sh "http://<mac-ip>:8010/tv#$TV_KEY"                         # makes tv-app/karaoke-tv.apk
+tv-app/build.sh https://karaoke.joshyfruit.com/tv   # makes tv-app/karaoke-tv.apk
 ```
 
-Install: on the TV, open Settings > Device Preferences > About and click Build 7 times. Then turn on USB debugging in Developer options, and run `adb connect <tv-ip>:5555` and `adb install tv-app/karaoke-tv.apk`. You can also copy the APK to a USB stick and open it with the TV's file manager (allow unknown apps). Rebuild if the Mac's IP or the key changes. A DHCP reservation on the router keeps the IP fixed. `PUBLIC_URL` sets the join link the TV shows.
+Install: on the TV, open Settings > Device Preferences > About and click Build 7 times. Then turn on USB debugging in Developer options, and run `adb connect <tv-ip>:5555` and `adb install tv-app/karaoke-tv.apk`. You can also copy the APK to a USB stick and open it with the TV's file manager (allow unknown apps). Rebuild if the server address changes. Clearing the app's data gives the TV a new key and room code. A DHCP reservation on the router keeps the IP fixed. `PUBLIC_URL` sets the join link the TV shows.
 
 Test: `python3 -m unittest test_server`
 
-Limits: one room per server run, kept in memory (a restart gives a new code and an empty queue). Anyone with the code can control the queue. No accounts, chat or scoring.
+Limits: rooms are kept in memory, so a restart empties the queue (up to 50 TVs, the longest idle is dropped). Anyone with the code can control the queue. No accounts, chat or scoring.

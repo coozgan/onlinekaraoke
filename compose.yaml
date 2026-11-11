@@ -1,11 +1,10 @@
-# Put TV_KEY and TUNNEL_TOKEN in .env next to this file (chmod 600), then: docker compose up -d --build
+# Put TUNNEL_TOKEN in .env next to this file (chmod 600), then: docker compose up -d --build
 # In the Cloudflare dashboard, point karaoke.joshyfruit.com to http://karaoke:8010
 services:
   karaoke:
     build: .
     restart: unless-stopped
     environment:
-      TV_KEY: ${TV_KEY:?add TV_KEY to .env}
       PUBLIC_URL: https://karaoke.joshyfruit.com
     ports:
       - "${HOST_PORT:-8010}:8010"  # phones on your Wi-Fi can still use http://<mac-ip>:8010

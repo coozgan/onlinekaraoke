@@ -6,7 +6,7 @@ import server
 
 class T(unittest.TestCase):
     def test_queue_rules(self):
-        r = server.Room()
+        r = server.Room('k' * 20)
         self.assertEqual(r.reserve('', 'aaaaaaaaaaa', 't', ''), 'Type your name first.')
         self.assertEqual(r.reserve('Ann', 'bad id', 't', ''), 'That is not a YouTube video.')
         self.assertIsNone(r.reserve('Ann', 'aaaaaaaaaaa', 'A', ''))
@@ -30,7 +30,7 @@ class T(unittest.TestCase):
         httpd = ThreadingHTTPServer(('127.0.0.1', 0), server.H)
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         self.addCleanup(httpd.shutdown)
-        base, room = f'http://127.0.0.1:{httpd.server_port}', server.ROOM
+        base, key = f'http://127.0.0.1:{httpd.server_port}', 'tvkey_' + 'a' * 20
 
         def post(path, body):
             req = urllib.request.Request(base + path, json.dumps(body).encode(), {'Content-Type': 'application/json'})
@@ -40,13 +40,19 @@ class T(unittest.TestCase):
             except urllib.error.HTTPError as e:
                 return e.code, json.load(e)
 
+        self.assertEqual(post('/api/control', {'key': 'short', 'action': 'play'})[0], 403)  # bad key opens nothing
+        status, s = post('/api/control', {'key': key, 'action': 'play'})  # the TV's key opens its room
+        self.assertEqual((status, s['code']), (200, server.code_for(key)))
+        room = server.ROOMS[s['code']]
+        server.ROOMS.clear()  # server restart: the same TV key gets the same code back
+        self.assertEqual(post('/api/control', {'key': key, 'action': 'play'})[1]['code'], room.code)
         self.assertEqual(post('/api/reserve', {'code': 'WRONG1', 'name': 'x', 'id': 'aaaaaaaaaaa'})[0], 403)
         self.assertEqual(post('/api/reserve', {'code': 'ñ✓', 'name': 'x', 'id': 'aaaaaaaaaaa'})[0], 403)
         self.assertEqual(post('/api/reserve', {'code': room.code.lower(), 'name': 'Zed', 'id': 'zzzzzzzzzzz'})[0], 200)
         self.assertEqual(post('/api/ended', {'code': room.code, 'item': 1})[0], 403)  # guests can't end songs
         with urllib.request.urlopen(base + '/tv') as res:
             self.assertIn("connect-src 'self'", res.headers['Content-Security-Policy'])
-        status, _ = post('/api/control', {'key': room.tv_key, 'action': 'nope'})
+        status, _ = post('/api/control', {'key': key, 'action': 'nope'})
         self.assertEqual(status, 400)
 
     def test_search_filters_and_caches(self):

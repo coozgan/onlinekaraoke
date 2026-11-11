@@ -4,12 +4,16 @@
 Run: python3 server.py            (phones on the same Wi-Fi)
      python3 server.py --online   (also opens a public cloudflared link)
 """
-import atexit, json, os, re, secrets, socket, subprocess, sys, threading, time, urllib.error, urllib.request
+import atexit, hashlib, json, os, re, secrets, socket, subprocess, sys, threading, time, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 DIR = os.path.dirname(os.path.abspath(__file__))
+TV_KEY = re.compile(r'^[A-Za-z0-9_-]{16,64}$')
+ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # 32 letters, no 0/O/1/I
+MAX_ROOMS = 50
+BASE = 'http://127.0.0.1:8010'
 VIDEO_ID = re.compile(r'^[A-Za-z0-9_-]{11}$')
 LINK = re.compile(r'(?:youtu\.be/|[?&]v=|/shorts/|/embed/|/live/)([A-Za-z0-9_-]{11})')
 KARAOKE = re.compile(r'karaoke|videoke|minus ?one|instrumental|backing track|sing ?along', re.I)
@@ -22,21 +26,20 @@ CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtub
        "style-src 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'")
 
 
+def code_for(key):
+    """The room code comes from the TV's key, so after a server restart the TV gets the same code back."""
+    return ''.join(ALPHA[b % 32] for b in hashlib.sha256(key.encode()).digest()[:6])
+
+
 class Room:
-    # ponytail: one room per server run, in memory. A restart gives a new code and an empty queue.
-    def __init__(self):
-        self.code = ''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(6))
-        self.tv_key = secrets.token_urlsafe(16)
-        self.base = 'http://127.0.0.1:8010'
+    # ponytail: rooms live in memory. A server restart keeps the TV's code but empties the queue.
+    def __init__(self, key):
+        self.key, self.code, self.seen = key, code_for(key), time.time()
         self.lock = threading.Lock()
         self.queue, self.current, self.paused, self.seq = [], None, False, 0
 
     def join_url(self):
-        return f'{self.base}/?code={self.code}'
-
-    def allowed(self, code='', key=''):
-        same = lambda a, b: secrets.compare_digest(str(a).encode(), b.encode())  # bytes: str form rejects non-ASCII
-        return same(str(code).strip().upper(), self.code) or same(key, self.tv_key)
+        return f'{BASE}/?code={self.code}'
 
     def state(self):
         with self.lock:
@@ -87,7 +90,29 @@ class Room:
                 self._advance()
 
 
-ROOM = Room()
+ROOMS, ROOMS_LOCK = {}, threading.Lock()  # code -> Room
+
+
+def tv_room(key):
+    """A TV opens (or reopens) its room with the secret key it generated. None if the key is malformed."""
+    key = str(key or '')
+    if not TV_KEY.match(key):
+        return None
+    with ROOMS_LOCK:
+        room = ROOMS.get(code_for(key))
+        if room and not secrets.compare_digest(room.key, key):
+            return None  # another TV's key maps to this code (about 1 in a billion)
+        if not room:
+            if len(ROOMS) >= MAX_ROOMS:  # ponytail: cap memory by dropping the longest-idle TV; add auth if strangers abuse it
+                del ROOMS[min(ROOMS.values(), key=lambda r: r.seen).code]
+            room = ROOMS[code_for(key)] = Room(key)
+        room.seen = time.time()
+        return room
+
+
+def find(code='', key=''):
+    """Phones find a room by its code. The TV opens its room by key, so it comes back after a server restart."""
+    return tv_room(key) if key else ROOMS.get(str(code).strip().upper())
 
 
 def yt(target):
@@ -172,12 +197,14 @@ class H(BaseHTTPRequestHandler):
             with open(os.path.join(DIR, pages[url.path]), 'rb') as f:
                 return self.reply(200, f.read(), 'text/html; charset=utf-8')
         if url.path == '/qr.svg':
-            svg = qr_svg(ROOM.join_url())
+            room = ROOMS.get(q.get('code', '').upper())
+            svg = room and qr_svg(room.join_url())
             return self.reply(200, svg, 'image/svg+xml') if svg else self.reply(404, {'error': 'No QR'})
-        if url.path in ('/api/state', '/api/search') and not ROOM.allowed(q.get('code', ''), q.get('key', '')):
+        room = find(q.get('code', ''), q.get('key', ''))
+        if url.path in ('/api/state', '/api/search') and not room:
             return self.reply(403, {'error': 'Wrong room code. Check the code on the TV.'})
         if url.path == '/api/state':
-            return self.reply(200, ROOM.state())
+            return self.reply(200, room.state())
         if url.path == '/api/search':
             try:
                 return self.reply(200, {'results': search(q.get('q', ''))})
@@ -195,21 +222,22 @@ class H(BaseHTTPRequestHandler):
                 raise ValueError
         except ValueError:
             return self.reply(400, {'error': 'Bad request'})
-        if not ROOM.allowed(body.get('code', ''), body.get('key', '')):
-            return self.reply(403, {'error': 'Wrong room code. Check the code on the TV.'})
         path, item = urlparse(self.path).path, body.get('item')
+        room = find(body.get('code', ''), body.get('key', ''))
+        if not room:
+            return self.reply(403, {'error': 'Wrong room code. Check the code on the TV.'})
         item = item if isinstance(item, int) else None
         if path == '/api/reserve':
-            err = ROOM.reserve(body.get('name'), body.get('id'), body.get('title'), body.get('channel'))
+            err = room.reserve(body.get('name'), body.get('id'), body.get('title'), body.get('channel'))
         elif path == '/api/control':
-            err = ROOM.control(body.get('action'), item)
+            err = room.control(body.get('action'), item)
         elif path == '/api/ended':
-            if not secrets.compare_digest(str(body.get('key', '')).encode(), ROOM.tv_key.encode()):
+            if not body.get('key'):
                 return self.reply(403, {'error': 'Only the TV screen can report the end of a song.'})
-            err = ROOM.ended(item)
+            err = room.ended(item)
         else:
             return self.reply(404, {'error': 'Not found'})
-        self.reply(400, {'error': err}) if err else self.reply(200, ROOM.state())
+        self.reply(400, {'error': err}) if err else self.reply(200, room.state())
 
 
 def lan_ip():
@@ -224,16 +252,16 @@ def lan_ip():
 
 
 def tunnel(port):
+    global BASE
     proc = subprocess.Popen(['cloudflared', 'tunnel', '--no-autoupdate', '--url', f'http://127.0.0.1:{port}'],
                             stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True)
     atexit.register(proc.terminate)
     for line in proc.stderr:
         found = re.search(r'https://[a-z0-9-]+\.trycloudflare\.com', line)
         if found:
-            ROOM.base = found.group(0)
-            print(f'Online join link: {ROOM.join_url()}\n'
-                  # Some label-restricted videos only play when the embedding page is https on a real domain.
-                  f'TV screen over HTTPS (plays more videos): {ROOM.base}/tv#{ROOM.tv_key}', flush=True)
+            BASE = found.group(0)
+            # Some label-restricted videos only play when the embedding page is https on a real domain.
+            print(f'TV screen over HTTPS (plays more videos): {BASE}/tv', flush=True)
             break
     for _ in proc.stderr:  # keep reading so cloudflared never blocks on a full pipe
         pass
@@ -241,15 +269,10 @@ def tunnel(port):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '8010'))
-    ROOM.base = (os.environ.get('PUBLIC_URL') or f'http://{lan_ip()}:{port}').rstrip('/')
-    ROOM.tv_key = os.environ.get('TV_KEY') or ROOM.tv_key  # set it so the TV app's link survives restarts
-    if len(ROOM.tv_key) < 16:
-        sys.exit('TV_KEY must be at least 16 characters. Make one with: python3 -c "import secrets;print(secrets.token_urlsafe(16))"')
+    BASE = (os.environ.get('PUBLIC_URL') or f'http://{lan_ip()}:{port}').rstrip('/')
     server = ThreadingHTTPServer(('0.0.0.0', port), H)  # 0.0.0.0 so phones on the Wi-Fi can reach it
     threading.Thread(target=lambda: search(''), daemon=True).start()  # warm trending so phones see it at once
     if '--online' in sys.argv:
         threading.Thread(target=tunnel, args=(port,), daemon=True).start()
-    tv_base = os.environ.get('PUBLIC_URL', '').rstrip('/') or f'http://{lan_ip()}:{port}'
-    print(f'TV screen (open on the big screen): {tv_base}/tv#{ROOM.tv_key}\n'
-          f'Phones join: {ROOM.join_url()}   room code {ROOM.code}', flush=True)
+    print(f'TV screen (open on the big screen): {BASE}/tv   Phones join with the code it shows.', flush=True)
     server.serve_forever()

@@ -1,11 +1,11 @@
 #!/bin/sh
 # Build the Xiaomi / Android TV app with the installed Android SDK. No Gradle.
-# Usage: tv-app/build.sh 'http://192.168.1.121:8010/tv#YOUR_TV_KEY'   (the TV link server.py prints)
+# Usage: tv-app/build.sh 'https://karaoke.joshyfruit.com/tv'   (the TV link server.py prints)
 set -eu
-URL=${1:?usage: tv-app/build.sh 'http://<server>:8010/tv#<TV_KEY>'}
+URL=${1:?usage: tv-app/build.sh 'https://<server>/tv'}
 case $URL in
-  http://*/tv#?*|https://*/tv#?*) ;;
-  *) echo "Pass the TV link printed by server.py, like http://192.168.1.121:8010/tv#KEY" >&2; exit 1 ;;
+  http://*/tv|https://*/tv) ;;
+  *) echo "Pass the TV link printed by server.py, like https://karaoke.joshyfruit.com/tv" >&2; exit 1 ;;
 esac
 SDK=${ANDROID_HOME:-$HOME/Library/Android/sdk}
 BT=$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)
